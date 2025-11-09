@@ -15,7 +15,7 @@ Group Members (with NetIDs):
 Victoria Field, victoriafield
 Armani Romay, armaniromay
 Jesse Herrera, herrera42
-Jawaad Ramcharitar, jawaadramcharitar
+Jawaad Ramcharitar, jawaadramcharitar (test)
 Project Description: We are creating a program that will compress a directory of text files
 into a single zipped package with all text files in lexicographical order.
 We are going to use multiple threads to compress the files in parallel. The goal for this projectis to
