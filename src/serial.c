@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <zlib.h>   // allowed library to compress the files
 #define BUFFER_SIZE 1048576 // 1MB
+#define MAX_FILE_SIZE (2 * 1048576) // 2MB
 #define MAX_THREADS 19 // We should keep threads under 20 for this project */
 
 /*Group #: 25
@@ -90,22 +91,23 @@ void *compress_worker(void *arg) {
 		assert(f_in != NULL);
 		
 		// get file size using stat (faster than fseek/ftell)
-		struct stat st;
-		int stat_ret = fstat(fileno(f_in), &st);
-		assert(stat_ret == 0);
-		size_t file_size = (size_t) st.st_size;
+		// struct stat st;
+		// int stat_ret = fstat(fileno(f_in), &st);
+		// assert(stat_ret == 0);
+		// size_t file_size = (size_t) st.st_size;
 		
 		// allocate buffer and read entire file in one operation
-		unsigned char *input_buffer = (unsigned char *) malloc(file_size);
-		assert(input_buffer != NULL || file_size == 0);
-		if(file_size > 0) {
-			size_t read_count = fread(input_buffer, 1, file_size, f_in);
-			assert(read_count == file_size);
-		}
+		unsigned char *input_buffer = (unsigned char *) malloc(MAX_FILE_SIZE);
+		assert(input_buffer != NULL);
+		// if(file_size > 0) {
+		// 	size_t read_count = fread(input_buffer, 1, MAX_FILE_SIZE, f_in);
+		// 	assert(read_count == file_size);
+		// }
+		size_t nbytes = fread(input_buffer, 1, MAX_FILE_SIZE, f_in);
 		fclose(f_in);
 
 		// allocate output buffer with sufficient capacity
-		uLongf bound = compressBound((uLong) file_size);
+		uLongf bound = compressBound((uLong) nbytes);
 		unsigned char *output_buffer = (unsigned char *) malloc((size_t) bound);
 		assert(output_buffer != NULL || bound == 0);
 
@@ -116,7 +118,7 @@ void *compress_worker(void *arg) {
 		assert(ret == Z_OK);
 
 		strm.next_in = input_buffer;
-		strm.avail_in = (uInt) file_size;
+		strm.avail_in = (uInt) nbytes;
 		strm.next_out = output_buffer;
 		strm.avail_out = (uInt) bound;
 
@@ -129,7 +131,7 @@ void *compress_worker(void *arg) {
 		// store result
 		ctx->results[file_index].data = output_buffer;
 		ctx->results[file_index].compressed_size = compressed_size;
-		ctx->results[file_index].original_size = (int) file_size;
+		ctx->results[file_index].original_size = (int) nbytes;
 
 		// free input
 		free(input_buffer);
