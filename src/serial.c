@@ -15,7 +15,7 @@ Group Members (with NetIDs):
 Victoria Field, victoriafield
 Armani Romay, armaniromay
 Jesse Herrera, herrera42
-Jawaad Ramcharitar, jawaadramcharitar (test)
+Jawaad Ramcharitar, jawaadramcharitar
 Project Description: We are creating a program that will compress a directory of text files
 into a single zipped package with all text files in lexicographical order.
 We are going to use multiple threads to compress the files in parallel. The goal for this projectis to
@@ -39,6 +39,14 @@ typedef struct {
 	compressed_result_t *results;
 } worker_context_t;
 
+//Used struct for arguments to compress_worker:
+typedef struct {
+	char *input_path;
+    FILE *f_out;
+    pthread_mutex_t *lock;
+    int *total_in;
+    int *total_out;
+} worker_args_t;
 
 //Function to check if our file ends with .txt:
 static int ends_with_txt(const char *name) {
@@ -65,10 +73,48 @@ static void build_full_path(const char *directory_name, const char *file_name, c
 }
 
 
-//compress worker here, use mutex locks for critical sections....
+//Modified fucntion compress worker, uses mutex locks for critical sections
+//Function starts here:
+void *compress_worker(void *arg){
+	worker_args_t *args = (worker_args_t *)arg;
+    unsigned char buffer_in[BUFFER_SIZE];
+    unsigned char buffer_out[BUFFER_SIZE];
 
+    //Load file
+    FILE *f_in = fopen(args->input_path, "r");
+    if (!f_in) {
+        perror("Failed to open input file");
+        pthread_exit(NULL);
+    }
 
+	int nbytes = fread(buffer_in, 1, BUFFER_SIZE, f_in);
+    fclose(f_in);
 
+    //Zip file
+    z_stream strm;
+    int ret = deflateInit(&strm, 9);
+    assert(ret == Z_OK);
+    strm.avail_in = nbytes;
+    strm.next_in = buffer_in;
+    strm.avail_out = BUFFER_SIZE;
+    strm.next_out = buffer_out;
+
+    ret = deflate(&strm, Z_FINISH);
+    assert(ret == Z_STREAM_END);
+    deflateEnd(&strm); //Free internal allocations
+
+    int nbytes_zipped = BUFFER_SIZE - strm.avail_out;
+
+    //Protected dumping of zipped file
+    pthread_mutex_lock(args->lock);
+    fwrite(&nbytes_zipped, sizeof(int), 1, args->f_out);
+    fwrite(buffer_out, 1, nbytes_zipped, args->f_out);
+    *(args->total_in) += nbytes;
+    *(args->total_out) += nbytes_zipped;
+    pthread_mutex_unlock(args->lock);
+
+    pthread_exit(NULL);
+}
 
 //Modidied function compress_directory for multiple threads:
 //function starts here:
@@ -104,8 +150,8 @@ int compress_directory(char *directory_name) {
 	}
 	closedir(d);
 	qsort(files, nfiles, sizeof(char *), cmp);
-//function unfinished.... please continue here
-
+	//function unfinished.... please continue here
+}
 	
 
 
@@ -114,51 +160,68 @@ int compress_directory(char *directory_name) {
 
 
 
-	//Part of compress_directory function that was provided in the project (UNCHANGED CODE BELOW)
+	//Part of compress_directory function that was provided in the project
 	// create a single zipped package with all text files in lexicographical order
 	int total_in = 0, total_out = 0;
 	FILE *f_out = fopen("text.tzip", "w");
 	assert(f_out != NULL);
 	int i = 0;
-	for(i=0; i < nfiles; i++) {
-		int len = strlen(directory_name)+strlen(files[i])+2;
-		char *full_path = malloc(len*sizeof(char));
-		assert(full_path != NULL);
-		strcpy(full_path, directory_name);
-		strcat(full_path, "/");
-		strcat(full_path, files[i]);
 
-		unsigned char buffer_in[BUFFER_SIZE];
-		unsigned char buffer_out[BUFFER_SIZE];
+	//Call threads here
+	for(i=0; i < nfiles, i++){
 
-		// load file
-		FILE *f_in = fopen(full_path, "r");
-		assert(f_in != NULL);
-		int nbytes = fread(buffer_in, sizeof(unsigned char), BUFFER_SIZE, f_in);
-		fclose(f_in);
-		total_in += nbytes;
+		//Build paths
+		//Set args
+		//Create threads
 
-		// zip file
-		z_stream strm;
-		int ret = deflateInit(&strm, 9);
-		assert(ret == Z_OK);
-		strm.avail_in = nbytes;
-		strm.next_in = buffer_in;
-		strm.avail_out = BUFFER_SIZE;
-		strm.next_out = buffer_out;
-
-		ret = deflate(&strm, Z_FINISH);
-		assert(ret == Z_STREAM_END);
-
-		// dump zipped file
-		int nbytes_zipped = BUFFER_SIZE-strm.avail_out;
-		fwrite(&nbytes_zipped, sizeof(int), 1, f_out);
-		fwrite(buffer_out, sizeof(unsigned char), nbytes_zipped, f_out);
-		total_out += nbytes_zipped;
-
-		free(full_path);
 	}
+
+	//Add code to wait for threads to finish, original code commented out
+	for(i=0; i < nfiles; i++) {
+		// int len = strlen(directory_name)+strlen(files[i])+2;
+		// char *full_path = malloc(len*sizeof(char));
+		// assert(full_path != NULL);
+		// strcpy(full_path, directory_name);
+		// strcat(full_path, "/");
+		// strcat(full_path, files[i]);
+
+		// unsigned char buffer_in[BUFFER_SIZE];
+		// unsigned char buffer_out[BUFFER_SIZE];
+
+		// // load file
+		// FILE *f_in = fopen(full_path, "r");
+		// assert(f_in != NULL);
+		// int nbytes = fread(buffer_in, sizeof(unsigned char), BUFFER_SIZE, f_in);
+		// fclose(f_in);
+		// total_in += nbytes;
+
+		// // zip file
+		// z_stream strm;
+		// int ret = deflateInit(&strm, 9);
+		// assert(ret == Z_OK);
+		// strm.avail_in = nbytes;
+		// strm.next_in = buffer_in;
+		// strm.avail_out = BUFFER_SIZE;
+		// strm.next_out = buffer_out;
+
+		// ret = deflate(&strm, Z_FINISH);
+		// assert(ret == Z_STREAM_END);
+
+		// // dump zipped file
+		// int nbytes_zipped = BUFFER_SIZE-strm.avail_out;
+		// fwrite(&nbytes_zipped, sizeof(int), 1, f_out);
+		// fwrite(buffer_out, sizeof(unsigned char), nbytes_zipped, f_out);
+		// total_out += nbytes_zipped;
+
+		// free(full_path);
+	}
+
+	// UNCHANGED CODE BELOW
+	//Add additional cleanup (free mem used by threads etc.) as necessary
 	fclose(f_out);
+
+
+
 
 	printf("Compression rate: %.2lf%%\n", 100.0*(total_in-total_out)/total_in);
 
