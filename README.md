@@ -1,7 +1,5 @@
 # Operating-Systems-Multithread-Programming
 
-# Operating Systems — Multithread Programming
-
 This repository contains solutions and implementations for a **multithreaded programming project** completed as part of an Operating Systems coursework. The focus of this project is on **concurrency, thread management, synchronization, and safe shared resource access** using threads and related primitives in C/C++.
 
 ## Project Overview
